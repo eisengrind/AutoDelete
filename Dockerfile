@@ -1,17 +1,29 @@
-FROM golang:latest
+FROM golang:alpine AS build
 
-RUN apt update -y --allow-insecure-repositories && apt upgrade -y && \ 
-  apt install -y git && \
-  apt -y clean && \
-  go get -u -v github.com/riking/AutoDelete/cmd/autodelete
+ARG MODULE_PATH=github.com/eisengrind/AutoDelete
 
-RUN mkdir -p /autodelete/data && \
-  cp "/go/src/github.com/riking/AutoDelete/docs/build.sh" /autodelete/
+COPY . /go/src/${MODULE_PATH}/
 
-ENV HOME=/
+WORKDIR /go/src/${MODULE_PATH}/
+
+RUN go get -u -v
+
+WORKDIR /go/src/${MODULE_PATH}/cmd/autodelete/
+
+RUN go build -ldflags="-s -w" -v -o autodelete
+
+
+
+FROM alpine:latest
+
+ARG MODULE_PATH=github.com/eisengrind/AutoDelete
+
+COPY --from=build /go/src/${MODULE_PATH}/cmd/autodelete/autodelete /opt/autodelete/autodelete
+
+RUN mkdir -p /opt/autodelete/data/
 
 EXPOSE 2202
 
-WORKDIR /autodelete/
+WORKDIR /opt/autodelete/
 
-ENTRYPOINT ./build.sh && ./autodelete
+ENTRYPOINT /opt/autodelete/autodelete
